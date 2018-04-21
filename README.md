@@ -29,9 +29,7 @@ Take this example sequence identifier:
 | `000000000-B54L5` | ID of the flow cell. "B54L5" will be printed on the flow cell in this example |
 | `1` | lane number. For MiSeqs, there's only one lane |
 | `2` from `2108` | the side of the chip |
-| `1` from `2108` | the swath (for MiSeqs, this is always 1. For HiSeqs, each lane is two tiles wide, and the first
-                    pass from left-to-right is swath one, then the returning pass on the other
-                    side of the lane is swath two |
+| `1` from `2108` | the swath (for MiSeqs, this is always 1. For HiSeqs, each lane is two tiles wide, and the first pass from left-to-right is swath one, then the returning pass on the other side of the lane is swath two |
 | `08` from `2108` | the tile number. For MiSeqs, this is a number from 1 to 19 |
 | `4127` | the x-position of the read in the tile, in arbitrary units |
 | `8949` | the y-position of the read in the tile, in arbitrary units |
