@@ -1,0 +1,4 @@
+[package]
+name = "illumina_coordinates"
+version = "0.9.0"
+authors = ["Jim Rybarski <jim@rybarski.com>"]
