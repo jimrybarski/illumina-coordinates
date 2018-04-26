@@ -3,17 +3,26 @@
 [![Build Status](https://travis-ci.org/jimrybarski/illumina-coordinates.svg?branch=master)](https://travis-ci.org/jimrybarski/illumina-coordinates)
 
 In FASTQ files created by the Illumina sequencing process, the sequence identifiers contain the coordinates of the DNA
-cluster that produced the sequence. This library parses the identifiers.
+cluster that produced the sequence (among other things). This library parses the identifiers.
 
 ### Usage
 
 ```
 extern crate illumina_coordinates;
-use illumina_coordinates::parse_sequence_identifier;
 
-let sequence_identifier = "@M03745:11:000000000-B54L5:1:2108:4127:8949";
-let (sequencer_id, run_number, flow_cell_id, lane, side, swath, tile_number, x, y) = parse_sequence_identifier(&sequence_identifier).unwrap();
-
+fn main() {
+    let line = "@M03745:11:000000000-B54L5:1:2108:4127:8949";
+    let seq_id = illumina_coordinates::parse_sequence_identifier(&line).unwrap();
+    assert_eq!(seq_id.sequencer_id, "M03745".to_string());
+    assert_eq!(seq_id.run_count, 11);
+    assert_eq!(seq_id.flow_cell_id, "000000000-B54L5".to_string());
+    assert_eq!(seq_id.lane, 1);
+    assert_eq!(seq_id.side, 2);
+    assert_eq!(seq_id.swath, 1);
+    assert_eq!(seq_id.tile, 8);
+    assert_eq!(seq_id.x, 4127);
+    assert_eq!(seq_id.y, 8949);
+}
 ```
 
 ### Description of Fields
