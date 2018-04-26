@@ -7,7 +7,7 @@ cluster that produced the sequence (among other things). This library parses the
 
 ### Usage
 
-```
+```rust
 extern crate illumina_coordinates;
 
 fn main() {
