@@ -1,4 +1,4 @@
-# illumina-coordinates
+# illumina_coordinates
 
 [![Build Status](https://travis-ci.org/jimrybarski/illumina-coordinates.svg?branch=master)](https://travis-ci.org/jimrybarski/illumina-coordinates)
 
