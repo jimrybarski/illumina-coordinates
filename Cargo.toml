@@ -1,6 +1,6 @@
 [package]
 name = "illumina_coordinates"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["Jim Rybarski <jim@rybarski.com>"]
 description = "Parses Illumina sequence identifiers found in FASTQ files"
 repository = "https://github.com/jimrybarski/illumina-coordinates"

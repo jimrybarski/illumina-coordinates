@@ -13,6 +13,17 @@ use std::convert::From;
 use std::result::Result;
 use std::num;
 
+
+#[derive(Debug, PartialOrd, PartialEq)]
+/// Sample numbers are either the number from the sample sheet or a sequence if the read was from
+/// the Undetermined Reads
+pub enum Sample {
+    /// Sample number
+    Number(u8),
+    /// Sequence from Undetermined Reads
+    Sequence(String)
+}
+
 /// A parsed sequence identifier
 pub struct SequenceIdentifier {
     /// ID of the sequencing machine
@@ -32,21 +43,29 @@ pub struct SequenceIdentifier {
     /// The x-coordinate of the cluster
     pub x: u16,
     /// The y-coordinate of the cluster
-    pub y: u16
+    pub y: u16,
+    /// The read number
+    pub read: u8,
+    /// Whether the read was filtered for low quality (Y=filtered)
+    pub is_filtered: bool,
+    /// Indicates the type of control, 0 = not a control read
+    pub control_number: u8,
+    /// Number from sample sheet, or the sequence if the read is in Undetermined Reads
+    pub sample: Sample
 }
 
 #[derive(Debug)]
 /// Errors encountered when parsing FASTQ files
 pub enum IlluminaError {
     /// We expected an integer but did not find one
-    ParseIntError,
+    ParseError,
     /// The line was not structured as expected
     SplitError
 }
 
 impl From<num::ParseIntError> for IlluminaError {
     fn from(_: num::ParseIntError) -> IlluminaError {
-        IlluminaError::ParseIntError
+        IlluminaError::ParseError
     }
 }
 
@@ -54,7 +73,7 @@ impl From<num::ParseIntError> for IlluminaError {
 /// about 3x faster than using a regular expression.
 ///
 /// The fields in the example identifier below have the following meaning:
-/// @M03745:11:000000000-B54L5:1:2108:4127:8949
+/// @M03745:11:000000000-B54L5:1:2108:4127:8949 1:N:0:0
 ///
 /// M03745              ID of the sequencing machine
 ///
@@ -74,15 +93,24 @@ impl From<num::ParseIntError> for IlluminaError {
 ///
 /// 8949                the y-position of the read in the tile, in arbitrary units
 ///
+/// 1                   First (forward) read in a paired-end run
+///
+/// N                   Read was not filtered (sufficient quality)
+///
+/// 0                   This was not a control
+///
+/// 0                   This was the first sample on the sample sheet
+///
 /// See https://help.basespace.illumina.com/articles/descriptive/fastq-files/ for more information.
 ///
 /// # Example
 ///
 /// ```rust
 /// extern crate illumina_coordinates;
+/// use illumina_coordinates::Sample;
 ///
 /// fn main() {
-///     let line = "@M03745:11:000000000-B54L5:1:2108:4127:8949";
+///     let line = "@M03745:11:000000000-B54L5:1:2108:4127:8949 1:N:0:0";
 ///     let seq_id = illumina_coordinates::parse_sequence_identifier(&line).unwrap();
 ///     assert_eq!(seq_id.sequencer_id, "M03745".to_string());
 ///     assert_eq!(seq_id.run_count, 11);
@@ -93,24 +121,50 @@ impl From<num::ParseIntError> for IlluminaError {
 ///     assert_eq!(seq_id.tile, 8);
 ///     assert_eq!(seq_id.x, 4127);
 ///     assert_eq!(seq_id.y, 8949);
+///     assert_eq!(seq_id.read, 1);
+///     assert_eq!(seq_id.is_filtered, false);
+///     assert_eq!(seq_id.control_number, 0);
+///     assert_eq!(seq_id.sample, Sample::Number(0));
 /// }
 /// ```
 pub fn parse_sequence_identifier(text: &str) -> Result<SequenceIdentifier, IlluminaError> {
-    let cap: Vec<&str> = text.trim().split(':').collect();
-    if cap.len() != 7 {
+    let halves: Vec<&str> = text.trim().split(' ').collect();
+    if halves.len() != 2 {
+        return Err(IlluminaError::SplitError)
+    }
+    let left: Vec<&str> = halves[0].split(':').collect();
+    let right: Vec<&str> = halves[1].split(':').collect();
+    if left.len() != 7 {
         return Err(IlluminaError::SplitError);
     }
-    let sequencer_id = cap[0].split_at(1).1.to_string();
-    let run_count = cap[1].parse::<u16>()?;
-    let flow_cell_id = cap[2].to_string();
-    let lane = cap[3].parse::<u8>()?;
-    let (side, remainder) = cap[4].split_at(1);
+    if right.len() != 4 {
+        return Err(IlluminaError::SplitError);
+    }
+    let sequencer_id = left[0].split_at(1).1.to_string();
+    let run_count = left[1].parse::<u16>()?;
+    let flow_cell_id = left[2].to_string();
+    let lane = left[3].parse::<u8>()?;
+    let (side, remainder) = left[4].split_at(1);
     let (swath, tile) = remainder.split_at(1);
     let side = side.parse::<u8>()?;
     let swath = swath.parse::<u8>()?;
     let tile = tile.parse::<u8>()?;
-    let x = cap[5].parse::<u16>()?;
-    let y = cap[6].parse::<u16>()?;
+    let x = left[5].parse::<u16>()?;
+    let y = left[6].parse::<u16>()?;
+
+    let read = right[0].parse::<u8>()?;
+    let is_filtered = match right[1] {
+        "Y" => true,
+        "N" => false,
+        _ => return Err(IlluminaError::ParseError)
+    };
+    let control_number= right[2].parse::<u8>()?;
+    let sample = right[3].parse::<u8>();
+    let sample = match sample {
+        Ok(n) => Sample::Number(n),
+        Err(_) => Sample::Sequence(String::from(right[3]))
+    };
+
     Ok(SequenceIdentifier {
         sequencer_id,
         run_count,
@@ -120,7 +174,11 @@ pub fn parse_sequence_identifier(text: &str) -> Result<SequenceIdentifier, Illum
         swath,
         tile,
         x,
-        y
+        y,
+        read,
+        is_filtered,
+        control_number,
+        sample
     })
 }
 
@@ -131,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_parse() {
-        let line = "@M03745:11:000000000-B54L5:1:2108:4127:8949";
+        let line = "@M03745:11:000000000-B54L5:1:2108:4127:8949 1:N:0:0";
         let seq_id = parse_sequence_identifier(&line).unwrap();
         assert_eq!(seq_id.sequencer_id, "M03745".to_string());
         assert_eq!(seq_id.run_count, 11);
@@ -142,12 +200,15 @@ mod tests {
         assert_eq!(seq_id.tile, 8);
         assert_eq!(seq_id.x, 4127);
         assert_eq!(seq_id.y, 8949);
+        assert_eq!(seq_id.read, 1);
+        assert_eq!(seq_id.is_filtered, false);
+        assert_eq!(seq_id.control_number, 0);
+        assert_eq!(seq_id.sample, Sample::Number(0));
     }
-
-
+    
     #[test]
     fn test_parse_with_newline() {
-        let line = "@M03745:11:000000000-B54L5:1:2108:4127:8949\n";
+        let line = "@M03745:11:000000000-B54L5:1:2108:4127:8949 1:Y:0:0\n";
         let seq_id = parse_sequence_identifier(&line).unwrap();
         assert_eq!(seq_id.sequencer_id, "M03745".to_string());
         assert_eq!(seq_id.run_count, 11);
@@ -158,6 +219,10 @@ mod tests {
         assert_eq!(seq_id.tile, 8);
         assert_eq!(seq_id.x, 4127);
         assert_eq!(seq_id.y, 8949);
+        assert_eq!(seq_id.read, 1);
+        assert_eq!(seq_id.is_filtered, true);
+        assert_eq!(seq_id.control_number, 0);
+        assert_eq!(seq_id.sample, Sample::Number(0));
     }
 
     #[test]
