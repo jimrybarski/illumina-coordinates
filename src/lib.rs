@@ -226,6 +226,26 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_nextseq() {
+        // This is just a real NextSeq sequence identifier
+        let line = "@NS500358:204:HTN5KAFXY:1:11101:20886:1073 1:N:0:TAAGGC";
+        let seq_id = parse_sequence_identifier(&line).unwrap();
+        assert_eq!(seq_id.sequencer_id, "NS500358".to_string());
+        assert_eq!(seq_id.run_count, 204);
+        assert_eq!(seq_id.flow_cell_id, "HTN5KAFXY".to_string());
+        assert_eq!(seq_id.lane, 1);
+        assert_eq!(seq_id.side, 1);
+        assert_eq!(seq_id.swath, 1);
+        assert_eq!(seq_id.tile, 101);
+        assert_eq!(seq_id.x, 20886);
+        assert_eq!(seq_id.y, 1073);
+        assert_eq!(seq_id.read, 1);
+        assert_eq!(seq_id.is_filtered, false);
+        assert_eq!(seq_id.control_number, 0);
+        assert_eq!(seq_id.sample, Sample::Sequence("TAAGGC".into()));
+    }
+
+    #[test]
     fn test_parse_error() {
         let result = parse_sequence_identifier("CACGACGACTAGCTACGGACGCGGCACGACGCAG");
         assert!(result.is_err());
